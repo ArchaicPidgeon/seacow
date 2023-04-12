@@ -1,0 +1,82 @@
+<!doctype html>
+<title>zq</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.16.0/ace.js" integrity="sha512-Km4SIAd8d2xB73+j5NmOjzIxriadCWR9xapO/YARlvfwkgrWneSpV/6GeaRzVLNckFHzUn9Iv1oGbsDW/HtTZQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://unpkg.com/prettier@2.8.7/standalone.js"></script>
+<script src="https://unpkg.com/prettier@2.8.7/parser-babel.js"></script>
+<script src="../compiler.js"></script>
+<script src="libra.js"></script>
+<script src="script-ace.js" defer></script>
+<div id="input">say "hello"</div>
+<div id="output"></div>
+<div id="controls">
+    <div class="button">tokens</div>
+    <div class="button">parse tree</div>
+    <div class="button">javascript</div>
+    <div class="button">evaluate</div>
+    <div class="button">save</div>
+    <div class="button">help</div>
+</div>
+
+<script>
+
+</script>
+
+<style>
+
+#input {
+    border-radius: 8px;
+}
+
+#output {
+    border-radius: 8px;
+    background: #161616;
+    white-space: pre-wrap;
+}
+
+#controls {
+    border-radius: 8px;
+    background: black;
+    grid-column-start: 1;
+    grid-column-end: 3;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr;
+    grid-gap: 10px;
+}
+
+.button {
+    display: grid;
+    border-radius: 8px;
+    place-content: center;
+    background: #161616;
+    color: #E6E1DC;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    font: 16pt/normal 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'Source Code Pro', 'source-code-pro', monospace;
+}
+
+.button:hover {
+    background: #202020;
+}
+
+.button:active {
+    background: rgb(255, 65, 65);
+}
+
+body {
+    background-color: black;
+    display: grid;
+    grid-template-rows: 10fr 1fr;
+    grid-template-columns: 1fr 1fr;
+    margin: 0;
+    height: 100vh;
+    grid-gap: 10px;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+</style>
+
