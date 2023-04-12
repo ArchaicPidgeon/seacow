@@ -6,7 +6,7 @@
 
   select = html.select;
 
-  ({tokenize, parse, translate} = zq);
+  ({tokenize, parse, translate} = seacow);
 
   editorOptions = {
     fontSize: "16pt",
@@ -58,14 +58,14 @@
   };
 
   select('#controls').onclick = function(evt) {
-    var ast, error, jsCode, label, tokens, zqCode;
+    var ast, error, jsCode, label, seaCode, tokens;
     try {
       if (!evt.target.classList.contains('button')) {
         return;
       }
       label = evt.target.innerText;
-      zqCode = input.getValue();
-      tokens = tokenize(zqCode);
+      seaCode = input.getValue();
+      tokens = tokenize(seaCode);
       ast = parse(tokens);
       jsCode = translate(ast);
       vault.set('last', input.getValue());
