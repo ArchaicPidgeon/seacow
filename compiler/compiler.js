@@ -33,7 +33,7 @@
 
   numRegexB = RegExp(`^[+-]?([0-9]+[.][0-9]+|[.][0-9]+|[0-9]+)${la}`);
 
-  operatorRegex = RegExp(`^(==|!=|<=|>=|<<|>>|//|%%|\\*\\*|[-+*/%=<>])${lanpa}`);
+  operatorRegex = RegExp(`^(==|!=|<=|>=|<<|>>|//|%%|::|is not|is|\\*\\*|[-+*/%=<>])${lanpa}`);
 
   reservedWordRegex = RegExp(`^(def|await|yield|outer|var|let|return|break|continue|comment|lang|default|while|until|loop|for|of|in|ever|if|unless|else|opt|alt|do|try|catch|finally)${lanpa}`);
 
@@ -321,7 +321,7 @@
 
   //#########################################################################################
   parse = function(tokenStream) {
-    var advance, blockTypes, canStartHead, checkName, endExpr, handleAwaitYield, handleScope, handleUpdate, hasArguments, idx, isDestructName, isParamName, isSimpleName, isVarName, makeStrict, nextToken, parseArgBlock, parseConditional, parseDeclaration, parseDef, parseDestruct, parseExpression, parseFatArrow, parseFor, parseHead, parseLet, parseLineFunction, parseLoopControl, parseObject, parseObjectBlock, parseOpt, parseParen, parsePipeAssign, parsePipeCall, parsePipeOp, parseReturn, parseStatementBlock, parseStringInterp, parseTag, parseTerminal, parseThrow, parseTry, parseValue, parseWhile, token, valueTypes;
+    var advance, blockTypes, canStartHead, checkName, endExpr, handleAwaitYield, handleScope, handleUpdate, hasArguments, idx, isAssignment, isDestructName, isParamName, isSimpleName, isVarName, makeStrict, nextToken, parseArgBlock, parseConditional, parseDeclaration, parseDef, parseDestruct, parseExpression, parseFatArrow, parseFor, parseHead, parseLet, parseLineFunction, parseLoopControl, parseObject, parseObjectBlock, parseOpt, parseParen, parsePipeAssign, parsePipeCall, parsePipeOp, parseReturn, parseStatementBlock, parseStringInterp, parseTag, parseTerminal, parseThrow, parseTry, parseValue, parseWhile, token, valueTypes;
     idx = 0;
     token = null;
     nextToken = null;
@@ -413,7 +413,7 @@
         });
       }
       while (true) {
-        if (token.content === '=') {
+        if (token.content === '::') {
           content.push(parsePipeAssign());
         } else if (token.type === 'dotName') {
           content.push(parsePipeCall(canBeBlock));
@@ -955,7 +955,7 @@
       while (true) {
         //if token.type is 'newline'
         //    parseTerminal()
-        if (token.content === 'let') {
+        if (isAssignment()) {
           content.push(parseLet());
         } else if (token.content === 'return') {
           content.push(parseReturn());
@@ -1090,7 +1090,7 @@
       if (token.type === 'newline') {
         parseTerminal();
       }
-      if (token.content === 'let') {
+      if (isAssignment()) {
         content.push(parseLet());
       } else if (token.content === 'return') {
         content.push(parseReturn());
@@ -1212,10 +1212,23 @@
         content
       };
     };
+    isAssignment = function() {
+      var idx2, ref;
+      idx2 = idx - 1;
+      while (true) {
+        if (tokenStream[idx2].content === '=') {
+          return true;
+        }
+        if ((ref = tokenStream[idx2].type) !== 'name' && ref !== 'openParen' && ref !== 'closeParen') {
+          return false;
+        }
+        idx2++;
+      }
+    };
     parseLet = function() {
       var content;
       content = [];
-      parseTerminal();
+      //parseTerminal()
       if (isVarName(token)) {
         content.push(parseTerminal());
       } else if (token.type === 'openParen') {
@@ -1413,7 +1426,30 @@
       return exp;
     },
     pipeOp: function(subNodes) {
-      return [pVal, subNodes[0], subNodes[1]].join('');
+      var op;
+      op = subNodes[0];
+      if (op === '') {
+        return "do stuff";
+      }
+      return [pVal, op, subNodes[1]].join('');
+    },
+    biOp: function(content) {
+      if (content === "is") {
+        return "===";
+      }
+      if (content === "==") {
+        return "===";
+      }
+      if (content === "is not") {
+        return "!==";
+      }
+      if (content === "!=") {
+        return "!==";
+      }
+      //return "" if content is ""
+      //return "" if content is ""
+      //return "" if content is ""
+      return content;
     },
     pipeAssign: function(subNodes) {
       var name;
@@ -1467,9 +1503,6 @@
       res = res.replace('&', 'arguments[0]');
       res = res.replace('~', '...');
       return res.replace('!', '');
-    },
-    biOp: function(content) {
-      return content;
     },
     bool: function(content) {
       return content;

@@ -25,7 +25,7 @@ numRegexB =
 ///^ [+-]? ( [0-9]+[.][0-9]+ | [.][0-9]+ | [0-9]+ ) #{la} ///
 
 operatorRegex =
-/// ^(==|!=|<=|>=|<<|>>|//|%%|\*\*|[-+*/%=<>]) #{lanpa} ///
+/// ^(==|!=|<=|>=|<<|>>|//|%%|::|is\ not|is|\*\*|[-+*/%=<>]) #{lanpa} ///
 
 reservedWordRegex = /// ^(def|await|yield|outer|var|let|return
 |break|continue|comment|lang|default|while|until|loop|for|of|in
@@ -321,7 +321,7 @@ parse = (tokenStream) ->
         else content.push {type: 'head', content: [{type: 'name', content: '&'}]}
 
         while true
-            if token.content is '='
+            if token.content is '::'
                 content.push parsePipeAssign()
             else if token.type is 'dotName'
                 content.push parsePipeCall canBeBlock
@@ -701,7 +701,7 @@ parse = (tokenStream) ->
         while true
             #if token.type is 'newline'
             #    parseTerminal()
-            if token.content is 'let'
+            if isAssignment()
                 content.push parseLet()
             else if token.content is 'return'
                 content.push parseReturn()
@@ -812,7 +812,7 @@ parse = (tokenStream) ->
 
         parseTerminal() if token.type is 'newline'
 
-        if token.content is 'let'
+        if isAssignment()
             content.push parseLet()
         else if token.content is 'return'
             content.push parseReturn()
@@ -906,11 +906,20 @@ parse = (tokenStream) ->
 
         return {type: 'opt', content}
 
+    isAssignment = ->
+        idx2 = idx - 1
+        while true
+            if tokenStream[idx2].content is '='
+                return true
+            unless tokenStream[idx2].type in ['name', 'openParen', 'closeParen']
+                return false
+            idx2++
+
     parseLet = ->
 
         content = []
 
-        parseTerminal()
+        #parseTerminal()
 
         if isVarName token
             content.push parseTerminal()
@@ -1050,7 +1059,21 @@ generate =
 
         return exp
 
-    pipeOp: (subNodes) -> return [pVal, subNodes[0], subNodes[1]].join ''
+    pipeOp: (subNodes) ->
+        op = subNodes[0]
+        if op is ''
+            return "do stuff"
+        return [pVal, op, subNodes[1]].join ''
+
+    biOp: (content) ->
+        return "===" if content is "is"
+        return "===" if content is "=="
+        return "!==" if content is "is not"
+        return "!==" if content is "!="
+        #return "" if content is ""
+        #return "" if content is ""
+        #return "" if content is ""
+        return content
 
     pipeAssign: (subNodes) ->
         name = subNodes[0].replaceAll '?.', '.'
@@ -1095,7 +1118,6 @@ generate =
         res = res.replace('~', '...')
         return res.replace '!', ''
 
-    biOp: (content) -> return content
     bool: (content) -> return content
     number: (content) -> return content
     dotName: (content) -> return content
