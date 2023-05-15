@@ -15,8 +15,8 @@ run = (x) -> x()
 
 ##########################################################################################
 
-la =    '(?=[, :})#\\]]|\\n|$)' # look ahead
-lanpa = '(?=[, })#\\]]|\\n|$)' # look ahead - no prop access
+la_old = '(?=[, :})#\\]]|\\n|$)' # look ahead
+la = '(?=[, })#\\]]|\\n|$)' # look ahead - no prop access
 
 numRegexA =
 ///^ [+-]? ( [0-9A-Z]+[.][0-9A-Z]+ | [.][0-9A-Z]+ | [0-9A-Z]+ )/[0-9]+ #{la} ///i
@@ -25,21 +25,26 @@ numRegexB =
 ///^ [+-]? ( [0-9]+[.][0-9]+ | [.][0-9]+ | [0-9]+ ) #{la} ///
 
 operatorRegex =
-/// ^(==|!=|<=|>=|<<|>>|//|%%|::|is\ not|is|\*\*|[-+*/%=<>]) #{lanpa} ///
+/// ^(==|!=|<=|>=|<<|>>|//|%%|::|is\ not|and|or|is|\*\*|[-+*/%<>]) #{la} ///
 
 reservedWordRegex = /// ^(def|await|yield|outer|var|let|return
 |break|continue|comment|lang|default|while|until|loop|for|of|in
-|ever|if|unless|else|opt|alt|do|try|catch|finally) #{lanpa} ///
+|ever|if|unless|else|opt|alt|do|try|catch|finally) #{la} ///
+
+forbiddenWordsRegex = /// ^[.:]?(class|inherits|case|debugger|new|delete|function|
+instanceof|typeof|switch|typeof|void|with|const|export|import|super|let|
+static|enum|implements|interface|package|private|protected|public) #{la} ///
 
 nameRegexA =
     ///^~?
-    ( @?[a-zA-Z_$][a-zA-Z0-9_$]* | &[a-zA-Z_$][a-zA-Z0-9_$]* | &[0-9]+ | && | & )
-    ( [?]?:[a-zA-Z_$][a-zA-Z0-9_$]* )* [?!]? #{la}
+    ( @?[a-zA-Z_$][a-zA-Z0-9_$]* | &[a-zA-Z_$][a-zA-Z0-9_$]* | &[0-9]+ | && | & | @ )
+    ( [?]?(\.|:|::)[a-zA-Z_$][a-zA-Z0-9_$]* )* [?!]? #{la}
     ///
 
 nameRegexB =
     ///^
-    ( [.:]?[a-zA-Z_$][a-zA-Z0-9_$]* ) ( [?]?:[a-zA-Z_$][a-zA-Z0-9_$]* )* [?]? #{la}
+    ( [.:]?[a-zA-Z_$][a-zA-Z0-9_$]* ) ( [?]?(\.|:)[a-zA-Z_$][a-zA-Z0-9_$]* )* [?]?
+    #{la}
     ///
 
 ##########################################################################################
@@ -113,25 +118,32 @@ tokenize = (charStream, logMode) ->
         eat {type: 'comment', content: res[0]}
         return true
 
+    tokenFuncs.forbidden = ->
+        res = charStream[idx..].match forbiddenWordsRegex
+        if res
+            throw 'js reserved word: ' + res[0]
+
+    tokenFuncs.assign = -> scanToken 'assign', "^=" + la
     tokenFuncs.bool = -> scanToken 'bool', "^true|false" + la
     tokenFuncs.reservedWord = -> scanToken 'resWord', reservedWordRegex
     tokenFuncs.operator = -> scanToken 'biOp', operatorRegex
-    tokenFuncs.label = -> scanToken 'label', '^/[a-zA-Z_$]+/' + lanpa
-    tokenFuncs.comma = -> scanToken 'comma', '^,' + lanpa
+    tokenFuncs.label = -> scanToken 'label', '^/[a-zA-Z_$]+/' + la
+    tokenFuncs.comma = -> scanToken 'comma', '^,' + la
     tokenFuncs.wave = -> scanToken 'wave', '^~' + la
-    tokenFuncs.pipe = -> scanToken 'pipe', '^\\|' + lanpa
-    tokenFuncs.key = -> scanToken 'key', '^[a-zA-Z][a-zA-Z0-9_$]*[:;]' + lanpa
+    tokenFuncs.pipe = -> scanToken 'pipe', '^\\|' + la
+    tokenFuncs.key = -> scanToken 'key', '^[a-zA-Z][a-zA-Z0-9_$]*[:;]' + la
+    tokenFuncs.extends = -> scanToken 'key', '^extends' + la
     tokenFuncs.name = -> scanToken 'name', nameRegexA
-    tokenFuncs.tag = -> scanToken 'tag', '^<(\\w+)(#\\w+)?(\\.\\w+)*>' + lanpa
+    tokenFuncs.tag = -> scanToken 'tag', '^<(\\w+)(#\\w+)?(\\.\\w+)*>' + la
     tokenFuncs.dotName = -> scanToken 'dotName', nameRegexB
-    tokenFuncs.thinArrow = -> scanToken 'thinArrow', '^->' + lanpa
-    tokenFuncs.fatArrow = -> scanToken 'fatArrow', '^=>' + lanpa
+    tokenFuncs.thinArrow = -> scanToken 'thinArrow', '^->' + la
+    tokenFuncs.fatArrow = -> scanToken 'fatArrow', '^=>' + la
     tokenFuncs.space = -> scanToken 'space', '^[ ]+'
     tokenFuncs.openParen = -> scanToken 'openParen', '^\\('
     tokenFuncs.closeParen = -> scanToken 'closeParen', '^\\)' + la
     tokenFuncs.openCurly = -> scanToken 'openCurly', '^[{]'
     tokenFuncs.closeCurly = -> scanToken 'closeCurly', '^[}]' + la
-    tokenFuncs.inlineComment = -> scanToken 'comment', '^\\[.*\\]' + lanpa
+    tokenFuncs.inlineComment = -> scanToken 'comment', '^\\[.*\\]' + la
 
     tokenFuncs.numberRadix = -> scanToken 'number', numRegexA
     tokenFuncs.numberSep = -> scanToken 'number', '^[0-9]{1,3}(_[0-9]{3})+' + la
@@ -144,10 +156,10 @@ tokenize = (charStream, logMode) ->
     tokenFuncs.arrowStringB = -> scanTokenBlock 'blockString', /^~>(?![^ \n])/
     tokenFuncs.arrowStringC = -> scanToken 'string', /^~>(?=\n)|^~>$/
 
-    tokenFuncs.stringSingle = -> scanToken 'string', ///^'[a-zA-Z0-9_-]*#{lanpa}///
+    tokenFuncs.stringSingle = -> scanToken 'string', ///^'[a-zA-Z0-9_-]*#{la}///
     tokenFuncs.stringDouble = -> scanToken 'string', ///^"(?:\\.|[^"[])*"#{la}///
 
-    tokenFuncs.stringStart = -> scanToken 'stringStart', ///^"(?:\\.|[^"[])*\[#{la}///
+    tokenFuncs.stringStart = -> scanToken 'stringStart', ///^"(?:\\.|[^"[])*\[///
     tokenFuncs.stringMiddle = -> scanToken 'stringMiddle', ///^](?:\\.|[^"[])*\[#{la}///
     tokenFuncs.stringEnd = -> scanToken 'stringEnd', ///^](?:\\.|[^"[])*"#{la}///
 
@@ -223,6 +235,12 @@ tokenize = (charStream, logMode) ->
 
     continue while advance()
 
+    for token in tokenStream
+        #log token.type, token.content
+        if (token.type is 'key') and (token.content is 'extends')
+            token.content = '__proto__:'
+            #log token
+
     return tokenStream.filter (token) ->
         token.type not in ['space', 'comment', 'emptyLine']
 
@@ -254,7 +272,7 @@ parse = (tokenStream) ->
     endExpr = false
 
     valueTypes = [
-        'string', 'number', 'thinArrow', 'openCurly', 'stringStart'
+        'string', 'number', 'thinArrow', 'openCurly', 'stringStart', 'key',
         'name', 'openParen', 'blockString', 'fatArrow', 'bool', 'tag'
     ]
 
@@ -277,6 +295,8 @@ parse = (tokenStream) ->
             if (not canBeUpdate) and token.content.endsWith '!'
                 throw 'bad update'
             return parseTerminal()
+        else if token.type is 'key'
+            return parseObject canBeBlock
         else if token.type in ['bool', 'number', 'string', 'blockString']
             return parseTerminal()
         else if token.type is 'stringStart'
@@ -314,6 +334,10 @@ parse = (tokenStream) ->
 
         content = []
 
+        if isAssignment()
+            mustBeHead = true
+            content.push parseAssignemnt()
+
         if canStartHead token
             content.push parseHead canBeBlock
         else if mustBeHead
@@ -340,6 +364,9 @@ parse = (tokenStream) ->
                 then parseTerminal()
                 else break
             else break
+
+        if token.type is 'assign'
+            throw 'illegal assignment in expression'
 
         # handle update assignment
         handleUpdate content
@@ -381,8 +408,8 @@ parse = (tokenStream) ->
             else if token.type is 'indent' and canBeBlock
                 endExpr = true
                 content.push parseArgBlock()
-            else if token.type is 'key'
-                content.push parseObject canBeBlock
+            #else if token.type is 'key'
+            #    content.push parseObject canBeBlock
             else break
 
         return {type: 'head', content}
@@ -433,6 +460,8 @@ parse = (tokenStream) ->
             content.push parseTerminal()
             unless token.type in valueTypes
                 throw 'bad value'
+            if token.type is 'key'
+                throw 'bad key'
             endExpr = true if token.type in blockTypes
             if (token.type is 'name') and (token.content.startsWith '~')
                 throw 'bad spread'
@@ -441,7 +470,6 @@ parse = (tokenStream) ->
         return {type: 'object', content}
 
     parseParen = ->
-
         parseTerminal()
         unless canStartHead token
             throw '(bad)'
@@ -468,6 +496,10 @@ parse = (tokenStream) ->
 
         type = token.type
 
+        if type is 'openCurly'
+        then canBeBlock = false
+        else canBeBlock = true
+
         parseTerminal()
 
         #throw 'bad comma' if token.type is 'comma'
@@ -480,7 +512,7 @@ parse = (tokenStream) ->
             parseTerminal()
 
         if (canStartHead token) or (token.type in ['biOp', 'dotName'])
-            content.push parseExpression mustBeHead: false, canBeBlock: false
+            content.push parseExpression mustBeHead: false, canBeBlock: canBeBlock
         else content.push {type: 'empty', content: ''}
 
         if type is 'openCurly'
@@ -552,10 +584,15 @@ parse = (tokenStream) ->
             if isString node.content
                 return
 
-            if node.type in ['def', 'blockFunc']
+            subNodes = node.content
+
+            if node.type is 'blockFunc'
                 return
 
-            subNodes = node.content
+            if node.type is 'def'
+                #log subNodes[1].content
+                vars.push subNodes[1].content
+                return
 
             if node.type is 'pipeAssign'
                 if isString subNodes[0].content
@@ -567,7 +604,7 @@ parse = (tokenStream) ->
                     if isString subNode.content
                         vars.push subNode.content
 
-            if node.type is 'let'
+            if node.type is 'assignment'
                 if isString subNodes[0].content
                     vars.push subNodes[0].content
 
@@ -588,7 +625,7 @@ parse = (tokenStream) ->
 
         vars = vars.filter (name) ->
 
-            (name not in outers) and (name.match /^:?[^@&:?]*$/)
+            (name not in outers) and (name.match /^:?[^@&:?.]*$/)
 
         vars = vars.map (name) ->
 
@@ -645,6 +682,7 @@ parse = (tokenStream) ->
             else type = token.type
             content.push parseTerminal()
 
+        #log content.length > 0
         throw 'parseDestruct' unless content.length > 0
 
         throw 'parseDestruct' unless token.type is 'closeParen'
@@ -701,9 +739,7 @@ parse = (tokenStream) ->
         while true
             #if token.type is 'newline'
             #    parseTerminal()
-            if isAssignment()
-                content.push parseLet()
-            else if token.content is 'return'
+            if token.content is 'return'
                 content.push parseReturn()
             else if token.content is 'throw'
                 content.push parseThrow()
@@ -812,9 +848,7 @@ parse = (tokenStream) ->
 
         parseTerminal() if token.type is 'newline'
 
-        if isAssignment()
-            content.push parseLet()
-        else if token.content is 'return'
+        if token.content is 'return'
             content.push parseReturn()
         else if token.content is 'throw'
             content.push parseThrow()
@@ -828,7 +862,7 @@ parse = (tokenStream) ->
             content.push parseTerminal()
         else if token.content is 'do'
             parseTerminal()
-            throw 'parseContitional' unless canStartHead token
+            throw 'parseConditional' unless canStartHead token
             content.push parseExpression mustBeHead: true, canBeBlock: true
 
         return {type, content}
@@ -907,16 +941,23 @@ parse = (tokenStream) ->
         return {type: 'opt', content}
 
     isAssignment = ->
+        types = ['name', 'dotName', 'openParen', 'closeParen']
         idx2 = idx - 1
+        tokensSeen = []
         while true
             if tokenStream[idx2].content is '='
-                return true
-            unless tokenStream[idx2].type in ['name', 'openParen', 'closeParen']
+                startsWithParen = tokensSeen.at(0).type is 'openParen'
+                endsWithParen = tokensSeen.at(-1).type is 'closeParen'
+                if startsWithParen and not endsWithParen
+                then return false
+                else return true
+            unless tokenStream[idx2].type in types
                 return false
+            tokensSeen.push tokenStream[idx2]
             idx2++
 
-    parseLet = ->
-
+    parseAssignemnt = ->
+        #log 'yay', token, nextToken
         content = []
 
         #parseTerminal()
@@ -925,15 +966,15 @@ parse = (tokenStream) ->
             content.push parseTerminal()
         else if token.type is 'openParen'
             content.push parseDestruct()
-        else throw 'parseLet'
+        else throw 'parseAssignment'
 
         throw '= expected' unless token.content is '='
         parseTerminal()
 
         throw 'value expected' unless canStartHead token
-        content.push parseExpression mustBeHead: true, canBeBlock: true
+        #content.push parseExpression mustBeHead: true, canBeBlock: true
 
-        return {type: 'let', content}
+        return {type: 'assignment', content}
 
     parseReturn = ->
 
@@ -965,11 +1006,11 @@ parse = (tokenStream) ->
 
         while true
 
-            if canStartHead token
+            if token.type is 'key'
+                content.push parseObjectBlock()
+            else if canStartHead token
                 content.push parseExpression mustBeHead: true, canBeBlock: true
                 throw 'bad argument: ' + token.type unless token.type is 'newline'
-            else if token.type is 'key'
-                content.push parseObjectBlock()
             else if token.type is 'newline'
                 parseTerminal()
             else if token.type is 'dedent'
@@ -996,6 +1037,8 @@ parse = (tokenStream) ->
             unless canStartHead token
                 log token
                 throw 'bad value'
+            if token.type is 'key'
+                throw 'bad key'
             content.push parseExpression mustBeHead: true, canBeBlock: true
             throw 'bad value: ' + token.type unless token.type is 'newline'
             parseTerminal()
@@ -1039,9 +1082,19 @@ generate =
     statementBlock: (subNodes) -> subNodes.join ';'
 
     expr: (subNodes) ->
+        #log subNodes
+
+        if subNodes[0].endsWith '='
+            a = subNodes.shift()
+
         sn = subNodes.map (x) -> pVal + '=' + x
         sn[sn.length - 1] = subNodes[subNodes.length - 1]
-        return "(#{sn.join(',')})"
+
+        exp = "(#{sn.join(',')})"
+
+        if a then exp = "(#{a}#{exp})"
+
+        return exp
 
     head: (subNodes) -> #subNodes.join ', '
 
@@ -1061,8 +1114,10 @@ generate =
 
     pipeOp: (subNodes) ->
         op = subNodes[0]
-        if op is ''
-            return "do stuff"
+        if op is '>>'
+            return "#{subNodes[1]}.push(#{pVal})"
+        if op is '<<'
+            return "#{pVal}.push(#{subNodes[1]})"
         return [pVal, op, subNodes[1]].join ''
 
     biOp: (content) ->
@@ -1070,8 +1125,8 @@ generate =
         return "===" if content is "=="
         return "!==" if content is "is not"
         return "!==" if content is "!="
-        #return "" if content is ""
-        #return "" if content is ""
+        return "||" if content is "or"
+        return "&&" if content is "and"
         #return "" if content is ""
         return content
 
@@ -1082,13 +1137,12 @@ generate =
             return "(#{name} != null ? #{name} : #{name} = #{pVal})"
         return "#{name}=#{pVal}"
 
-    let: (subNodes) ->
+    assignment: (subNodes) ->
         name = subNodes[0].replaceAll '?.', '.'
-        expr = subNodes[1]
         if name.endsWith '?'
             name = name[0 .. -2]
-            return "(#{name} != null ? #{name} : #{name} = #{expr})"
-        return "#{name}=#{expr}"
+            return "#{name}!=null?#{name}:#{name}="
+        return "#{name}="
 
     return: (subNodes) -> return ["return", ...subNodes].join ' '
     throw: (subNodes) -> return ["throw", ...subNodes].join ' '
@@ -1098,8 +1152,7 @@ generate =
         func = subNodes[0]
         args = subNodes[1 ..]
         type = (if func[0] is ':' then 'method' else 'function')
-        func = func.slice(1).replaceAll(':', '?.')
-
+        func = func.slice(1).replaceAll('::', '?.prototype?.').replaceAll(':', '?.')
         if type is 'method'
             return "#{pVal}.#{func}(#{args.join ','})"
         if type is 'function'
@@ -1109,6 +1162,7 @@ generate =
 
     name: (content) ->
         res = content
+        res = res.replaceAll('::', '?.prototype?.')
         res = res.replaceAll(':', '?.')
         res = res.replace('@', 'this.')
         res = res.replace('&&', 'arguments')
@@ -1116,6 +1170,8 @@ generate =
         res = res.replace /^&([^.]+)/, 'arguments[0].$1'
         res = res.replace('&', 'arguments[0]')
         res = res.replace('~', '...')
+        res = res.replace '].', ']'
+        if res is 'this.' then res = 'this'
         return res.replace '!', ''
 
     bool: (content) -> return content
@@ -1146,10 +1202,10 @@ generate =
 
     def: (content) ->
         kw = content[0]
-        name = content[1]
+        name = content[1].replaceAll '?', ''
         args = content[2 .. -2]
         block = content.at(-1)
-        return "#{kw} #{name}(#{args.join ','}){#{block}}"
+        return "#{name}=#{kw}(#{args.join ','}){#{block}}"
 
     lineFunction: (sn) -> "#{sn[0]}(#{sn[1..-2].join ','}){var _;return #{sn.at -1}}"
 
@@ -1257,6 +1313,20 @@ else globalThis.seacow = seacow
 # code | tokenize | parse | translate | format
 
 ###
+
+TODO: maybe
+
+    keywords: debugger, delete, import, export
+    numeric literals: bigInt, exponential (1e3)
+    macros
+
+TODO: cleanup
+
+    store the tokenizer functions in an array, instead of an object
+
+    make tokenBlock with a regex based
+
+    bring some order and sepertion to the parse functions
 
 TODO:
 X handle complex:names
