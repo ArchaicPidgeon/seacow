@@ -22,9 +22,8 @@ output.setOptions editorOptions
 output.setReadOnly true
 output.renderer.$cursorLayer.element.style.display = "none"
 
-input.setValue vault.get 'last' 
-input.gotoLine 0
-input.focus()
+window.input = input
+window.output = output
 
 format = (code) -> prettier.format code, parser: 'babel', plugins: prettierPlugins
 array = (...arr) ->  [...arr]
@@ -33,6 +32,23 @@ say = (...args) ->
     text =  output.getValue()
     newline = if text.length > 0 then '\n' else ''
     output.setValue text + newline + args.join(' ')
+
+save = ->
+    line = input.session.getLine 0
+    res = line.match /^\[save to: ([a-zA-Z0-9]+)\]$/
+    if res
+        vault.set res[1], input.getValue()
+        output.setValue "saved to #{res[1]}"
+    else
+        output.setValue "no save name found."
+
+load = (name) ->
+    # vault.get 'test | input.setValue
+    input.setValue vault.get name
+    input.gotoLine 0
+    input.focus()
+
+load 'last'
 
 select('#controls').onclick = (evt) ->
 
@@ -57,10 +73,10 @@ select('#controls').onclick = (evt) ->
         if label is 'evaluate'
             output.setValue ''
             eval jsCode
-        if label is 'examples'
-            output.setValue examples
-        if label is 'clear'
-            output.setValue ''
+        if label is 'save'
+            save()
+        if label is 'help'
+            output.setValue help
 
         output.gotoLine 1000000
 
@@ -73,11 +89,18 @@ addEventListener "keydown", (evt) ->
     #log evt
     #evt.preventDefault()
 
-examples =
-
+vault.set "animals",
 '''
-let animals = array 'rabits 'snakes 'whales 'ducks
+animals = array 'rabits 'snakes 'whales 'ducks
 for animal in animals
     say "i like [ animal ]"
 say "they are all cute"
+'''
+
+help = 
+'''
+to save your code, put "[save to: name]" on the first line and click save.
+replace name with your own name. names must match "[a-zA-Z0-9]+".
+
+to load your code, write "load 'name" in the editor and click "evaluate".
 '''
